@@ -21,7 +21,7 @@ from helper.helper import (
 )
 
 
-BASE_LICENSES = 101
+BASE_LICENSES = 100
 BASE_PERIOD = 12
 BASE_DISCOUNT = 0
 
@@ -510,20 +510,6 @@ def test_defect_06_tandm_reserve_amount_matches_ui(page):
     ),
     strict=False,
 )
-# =====================================================================
-# BUG-007.
-# В Excel формируется дублирующий / противоречивый блок T&M
-# =====================================================================
-
-@pytest.mark.xfail(
-    reason=(
-        "BUG-007: в Excel T&M формируется повторно — "
-        "присутствуют одновременно корректный итог "
-        "585000/29250/614250 и дополнительный блок "
-        "450000/22500/450000"
-    ),
-    strict=False,
-)
 def test_defect_07_no_duplicate_tandm_block(page):
     """
     При включённом модуле «Конструктор процессов»
@@ -538,6 +524,8 @@ def test_defect_07_no_duplicate_tandm_block(page):
     450000 / 22500 / 450000 появляться не должен.
     """
     prepare_base_calculation(page)
+
+    set_discount(page, 5)
 
     # Включаем «Конструктор процессов».
     toggle_module_by_id(
@@ -634,3 +622,4 @@ def test_defect_07_no_duplicate_tandm_block(page):
 
 # python -m pytest test_defects/test_defects.py -v
 # python -m pytest test_defects/test_defects.py::test_defect_07_no_duplicate_tandm_block -v
+# python -m pytest test_defects/test_defects.py::test_defect_06_tandm_reserve_amount_matches_ui -v
