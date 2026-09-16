@@ -1,0 +1,24 @@
+# Виртуальное окружение Python
+.venv/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+
+# Архивы и Excel-файлы
+*.zip
+*.xlsx
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Логи и временные файлы
+*.log
+*.tmp
+
+# Локальные конфиги
+.env
+env/
