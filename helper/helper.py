@@ -219,3 +219,133 @@ def validate_excel(file_path: str, expected_total: float) -> bool:
                 return True
 
     return False
+
+# --------------------- Работа с вкладкой «Внедрение» ---------------------
+
+def switch_to_tab_implementation(page: Page):
+    """Переключиться на вкладку Внедрение."""
+    page.click("#config-tab-implementation")
+    page.wait_for_timeout(300)
+
+
+def switch_to_tab_tm(page: Page):
+    """Переключиться на вкладку T&M."""
+    page.click("#config-tab-tm")
+    page.wait_for_timeout(300)
+
+
+def toggle_implementation_work(page: Page, work_name: str, enable: bool = True):
+    """
+    Включить/выключить типовую работу внедрения по названию.
+    Ищем label с текстом work_name внутри вкладки «Внедрение»
+    и кликаем по чекбоксу в родительском li.
+    """
+    switch_to_tab_implementation(page)
+    li = page.locator(
+        f"li.implementation-item:has(label:has-text('{work_name}'))"
+    )
+    if li.count() == 0:
+        # Фолбэк: ищем по общему паттерну
+        li = page.locator(f"li:has(label:has-text('{work_name}'))").first
+    checkbox = li.locator("input[type='checkbox']").first
+    if enable:
+        checkbox.check()
+    else:
+        checkbox.uncheck()
+    page.wait_for_timeout(200)
+
+
+def get_selected_implementation_works(page: Page) -> list:
+    """Вернуть список названий выбранных работ внедрения (из блока «Выбранные работы»)."""
+    switch_to_tab_implementation(page)
+    items = page.locator(".selected-work-name, .chosen-work-name").all()
+    return [el.inner_text().strip() for el in items]
+
+
+def get_tandm_hours(page: Page) -> int:
+    """Вернуть значение поля часов T&M."""
+    switch_to_tab_tm(page)
+    field = page.locator("#tmHours, #tm-hours, input[name='tmHours']").first
+    if field.count() == 0:
+        return 0
+    return int(field.input_value() or 0)
+
+
+def set_tandm_hours(page: Page, hours: int):
+    """Установить количество часов T&M."""
+    switch_to_tab_tm(page)
+    field = page.locator("#tmHours, #tm-hours, input[name='tmHours']").first
+    if field.count() == 0:
+        pytest.skip("Поле часов T&M не найдено — UI изменился")
+    field.fill(str(hours))
+    page.wait_for_timeout(300)
+
+
+def get_tandm_tariff(page: Page) -> float:
+    """Вернуть тариф T&M из UI (например, 5850 ₽/чч)."""
+    switch_to_tab_tm(page)
+    el = page.locator(".tm-tariff, .tariff-value, [data-testid='tm-tariff']").first
+    if el.count() == 0:
+        return 0.0
+    return extract_price(el.inner_text())
+
+
+# --------------------- Расширенный парсинг Excel ---------------------
+
+def get_excel_rows(file_path: str) -> list:
+    """
+    Вернуть список словарей {row_index, cells: [str|float|None]}
+    для всех непустых строк активного листа.
+    """
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    sheet = wb.active
+    rows = []
+    for i, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if any(c is not None and str(c).strip() != "" for c in row):
+            rows.append({"row": i, "cells": list(row)})
+    return rows
+
+
+def find_excel_rows(file_path: str, search_text: str) -> list:
+    """Найти все строки, где хотя бы одна ячейка содержит search_text (без учёта регистра)."""
+    needle = search_text.lower()
+    result = []
+    for r in get_excel_rows(file_path):
+        if any(c is not None and needle in str(c).lower() for c in r["cells"]):
+            result.append(r)
+    return result
+
+
+def count_excel_rows(file_path: str, search_text: str) -> int:
+    """Сколько раз встречается search_text в Excel."""
+    return len(find_excel_rows(file_path, search_text))
+
+
+def get_excel_value(file_path: str, label: str, column: int = -1) -> float:
+    """
+    Найти строку с label и вернуть число из указанной колонки.
+    column = -1 → последняя колонка строки.
+    """
+    rows = find_excel_rows(file_path, label)
+    if not rows:
+        return None
+    cells = rows[0]["cells"]
+    target = cells[column] if column >= 0 else cells[-1]
+    return _extract_number_from_cell(type("C", (), {"value": target})())
+
+
+def get_excel_total_rows(file_path: str) -> list:
+    """Вернуть все строки, содержащие 'всего' или 'итого'."""
+    return find_excel_rows(file_path, "всего") + find_excel_rows(file_path, "итого")
+
+
+def get_all_excel_text(file_path: str) -> str:
+    """Вернуть весь текст Excel одной строкой — для поиска названий продуктов."""
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    sheet = wb.active
+    parts = []
+    for row in sheet.iter_rows(values_only=True):
+        for c in row:
+            if c is not None:
+                parts.append(str(c))
+    return " | ".join(parts)
