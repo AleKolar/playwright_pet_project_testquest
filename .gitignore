@@ -30,7 +30,7 @@ htmlcov/
 *.png
 *.jpg
 *.jpeg
-*.gif
+
 screenshots/
 allure-results/
 playwright-report/
