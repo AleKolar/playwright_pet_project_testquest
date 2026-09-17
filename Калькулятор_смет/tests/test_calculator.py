@@ -192,4 +192,4 @@ def test_12_navigation_integration(page):
     # Предположим, что есть ссылка на "Мои сметы" (пока пропускаем)
     pytest.skip("Интеграция с 'Моими сметами' не реализована")
 
-# pytest tests/ -v
+# python -m pytest tests/ -v
