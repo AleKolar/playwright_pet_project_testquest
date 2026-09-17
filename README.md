@@ -45,13 +45,9 @@
 
 | ID | Файл / функция | Что проверяется |
 |---|---|---|
-| BUG-001 | `test_defect_01_excel_excludes_unselected_tz` | Excel не содержит работу «Подготовка технического задания», если она не выбрана в UI |
-| BUG-001 | `test_defect_02_excel_total_matches_ui_when_no_implementation` | Итог в Excel совпадает с итогом в UI, если в калькуляторе не выбрано ничего лишнего |
-| BUG-002 | `test_defect_03_tandm_amount_matches_ui` | Сумма T&M в Excel соответствует UI (100 чч × тариф) |
-| BUG-003 | `test_defect_04_tandm_vat_added` | В строке «Резерв на 100 чч» сумма с НДС = сумма без НДС × 1.05 |
-| BUG-004 | `test_defect_05_no_duplicate_total_in_tm` | В разделе T&M ровно одна строка «Всего» |
-| BUG-005 | `test_defect_06_no_duplicate_modules_in_excel` | Модули «Открытки» и «Тайный Санта» встречаются в Excel по одному разу |
-| BUG-006 | `test_defect_07_single_product_name` | В Excel используется одно название продукта, без смеси «Бублики» / «Пряники» / «TestQuest» |
+| BUG-005 | `test_defect_05_no_duplicate_modules_in_excel` | Модули «Навыки», «Цвет настроения», «Открытки» и «Тайный Санта» не должны дублироваться в Excel; проверяется также уникальность нумерации `Nпп` |
+| BUG-006 | `test_defect_06_tandm_reserve_amount_matches_ui` | Стоимость строки «Резерв на 100 чч» должна соответствовать расчёту 100 чч × 5 850 ₽/чч = 585 000 ₽ |
+| BUG-007 | `test_defect_07_no_duplicate_tandm_block` | Excel не должен содержать дополнительный противоречивый блок T&M `450000/22500/450000` при наличии корректного расчёта `585000/29250/614250` |
 
 ### Как запускать
 
