@@ -17,7 +17,8 @@ from helper.helper import (
     count_excel_rows,
     get_excel_row_amounts,
     get_excel_rows,
-    _extract_number_from_cell, toggle_module_by_id,
+    _extract_number_from_cell, toggle_module_by_id, set_kp_issue_date, set_kp_valid_until, get_kp_issue_date,
+    get_kp_valid_until,
 )
 
 
@@ -617,6 +618,43 @@ def test_defect_07_no_duplicate_tandm_block(page):
         "В Excel обнаружен дополнительный "
         "противоречивый блок T&M: "
         f"{invalid_tm_rows}"
+    )
+
+# =====================================================================
+# BUG-008.
+# В Excel формируется коммерческое предложения поле «Предложение действительно до» содержит дату,
+# которая предшествует дате выставления предложения.
+# =====================================================================
+@pytest.mark.xfail(
+    reason=(
+        "BUG-008: дата «Предложение действительно до» "
+        "может быть раньше даты выставления КП"
+    ),
+    strict=False,
+)
+def test_defect_08_kp_valid_until_not_before_issue_date(page):
+    """
+    Дата окончания действия КП не должна быть раньше
+    даты выставления КП.
+    """
+    set_kp_issue_date(
+        page,
+        "2026-09-16",
+    )
+
+    set_kp_valid_until(
+        page,
+        "2026-08-01",
+    )
+
+    issue_date = get_kp_issue_date(page)
+    valid_until = get_kp_valid_until(page)
+
+    assert valid_until >= issue_date, (
+        "Дата окончания действия КП не должна быть "
+        f"раньше даты выставления: "
+        f"дата предложения = {issue_date}, "
+        f"действительно до = {valid_until}"
     )
 
 

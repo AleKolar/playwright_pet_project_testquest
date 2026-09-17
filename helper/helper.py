@@ -86,6 +86,26 @@ def toggle_module(
     else:
         checkbox.uncheck()
 
+# --------------------- Работа с датами ---------------------
+def set_kp_issue_date(page: Page, date: str):
+    """Установить дату выставления КП. Формат: YYYY-MM-DD."""
+    page.fill("#kpIssueDate", date)
+
+
+def set_kp_valid_until(page: Page, date: str):
+    """Установить дату окончания действия КП. Формат: YYYY-MM-DD."""
+    page.fill("#kpValidUntil", date)
+
+
+def get_kp_issue_date(page: Page) -> str:
+    """Получить дату выставления КП. Формат: YYYY-MM-DD."""
+    return page.locator("#kpIssueDate").input_value()
+
+
+def get_kp_valid_until(page: Page) -> str:
+    """Получить дату окончания действия КП. Формат: YYYY-MM-DD."""
+    return page.locator("#kpValidUntil").input_value()
+
 # --------------------- Включить или выключить модуль по id чек-бокса ---------------------
 def toggle_module_by_id(
     page: Page,
