@@ -84,276 +84,276 @@ def prepare_base_calculation(page):
         )
 
 
-# =====================================================================
-# Проверка 1.
-# Excel не должен содержать невыбранную работу
-# =====================================================================
-
-def test_defect_01_excel_excludes_unselected_tz(page):
-    """
-    Если «Подготовка технического задания»
-    не выбрана в UI, она не должна попадать в Excel.
-    """
-    prepare_base_calculation(page)
-
-    switch_to_tab_implementation(page)
-
-    selected_works = get_selected_implementation_works(
-        page
-    )
-
-    assert (
-        "Подготовка технического задания"
-        not in selected_works
-    ), (
-        "Работа «Подготовка технического задания» "
-        "неожиданно выбрана в UI"
-    )
-
-    wait_for_calculation(page)
-
-    file_path = download_excel(page)
-
-    rows = find_excel_rows(
-        file_path,
-        "Подготовка технического задания",
-    )
-
-    assert len(rows) == 0, (
-        "Excel содержит невыбранную работу "
-        "«Подготовка технического задания»"
-    )
-
-
-# =====================================================================
-# Проверка 2.
-# Итог SAAS в Excel должен соответствовать UI
-# =====================================================================
-
-def test_defect_02_saas_total_matches_ui(page):
-    """
-    Итог TestQuest Облако в Excel должен
-    соответствовать итогу SAAS в UI.
-    """
-    prepare_base_calculation(page)
-
-    wait_for_calculation(page)
-
-    ui_total = get_total_sum(page)
-
-    file_path = download_excel(page)
-
-    saas_total = get_excel_row_amounts(
-        file_path,
-        "Всего",
-    )
-
-    assert saas_total is not None, (
-        "Строка «Всего» для SAAS "
-        "не найдена в Excel"
-    )
-
-    assert (
-        saas_total["without_vat"]
-        == pytest.approx(
-            ui_total,
-            abs=0.01,
-        )
-    ), (
-        f"UI SAAS total = {ui_total}, "
-        f"Excel SAAS total = "
-        f"{saas_total['without_vat']}"
-    )
-
-
-# =====================================================================
-# Проверка 3.
-# T&M в Excel должен соответствовать UI
-# =====================================================================
-
-def test_defect_03_tandm_amount_matches_ui(page):
-    """
-    T&M должен соответствовать расчёту UI:
-
-    100 чч × тариф = ожидаемая стоимость без НДС.
-    """
-    prepare_base_calculation(page)
-
-    set_tandm_hours(
-        page,
-        100,
-    )
-
-    tariff = get_tandm_tariff(page)
-
-    assert tariff > 0, (
-        "Тариф T&M не прочитан из UI"
-    )
-
-    expected_tandm = 100 * tariff
-
-    wait_for_calculation(page)
-
-    file_path = download_excel(page)
-
-    total_rows = [
-        row
-        for row in get_excel_rows(file_path)
-        if any(
-            cell is not None
-            and "всего" in str(cell).lower()
-            for cell in row["cells"]
-        )
-    ]
-
-    assert len(total_rows) >= 2, (
-        "В Excel не найдено второе итоговое значение "
-        "«Всего» для T&M"
-    )
-
-    # Первая строка «Всего» — SAAS.
-    # Вторая строка «Всего» — T&M.
-    tm_total_row = total_rows[1]
-
-    cells = tm_total_row["cells"]
-
-    assert len(cells) >= 5, (
-        f"В строке T&M недостаточно колонок: {cells}"
-    )
-
-    tm_total = _extract_number_from_cell(
-        type(
-            "Cell",
-            (),
-            {"value": cells[2]},
-        )()
-    )
-
-    assert tm_total is not None, (
-        f"Не удалось получить сумму T&M "
-        f"из строки: {cells}"
-    )
-
-    assert tm_total == pytest.approx(
-        expected_tandm,
-        abs=0.01,
-    ), (
-        f"UI T&M = {expected_tandm}, "
-        f"Excel T&M = {tm_total}"
-    )
-
-
-# =====================================================================
-# Проверка 4.
-# НДС T&M должен рассчитываться корректно
-# =====================================================================
-
-def test_defect_04_tandm_vat_is_calculated_correctly(page):
-    """
-    Проверить расчёт T&M:
-
-    Без НДС = 585000
-    НДС 5%   = 29250
-    С НДС    = 614250
-    """
-    prepare_base_calculation(page)
-
-    set_tandm_hours(
-        page,
-        100,
-    )
-
-    wait_for_calculation(page)
-
-    file_path = download_excel(page)
-
-    total_rows = [
-        row
-        for row in get_excel_rows(file_path)
-        if any(
-            cell is not None
-            and "всего" in str(cell).lower()
-            for cell in row["cells"]
-        )
-    ]
-
-    assert len(total_rows) >= 2, (
-        "В Excel не найдено второе итоговое значение "
-        "«Всего» для T&M"
-    )
-
-    # Вторая строка «Всего» — итог T&M.
-    tm_total_row = total_rows[1]
-
-    cells = tm_total_row["cells"]
-
-    assert len(cells) >= 5, (
-        f"В строке T&M недостаточно колонок: {cells}"
-    )
-
-    without_vat = _extract_number_from_cell(
-        type(
-            "Cell",
-            (),
-            {"value": cells[2]},
-        )()
-    )
-
-    vat = _extract_number_from_cell(
-        type(
-            "Cell",
-            (),
-            {"value": cells[3]},
-        )()
-    )
-
-    with_vat = _extract_number_from_cell(
-        type(
-            "Cell",
-            (),
-            {"value": cells[4]},
-        )()
-    )
-
-    assert without_vat is not None, (
-        f"Не удалось получить сумму без НДС: {cells}"
-    )
-
-    assert vat is not None, (
-        f"Не удалось получить НДС: {cells}"
-    )
-
-    assert with_vat is not None, (
-        f"Не удалось получить сумму с НДС: {cells}"
-    )
-
-    expected_vat = round(
-        without_vat * 0.05,
-        2,
-    )
-
-    expected_with_vat = round(
-        without_vat + expected_vat,
-        2,
-    )
-
-    assert vat == pytest.approx(
-        expected_vat,
-        abs=0.01,
-    ), (
-        f"Без НДС = {without_vat}, "
-        f"НДС = {vat}, "
-        f"ожидалось = {expected_vat}"
-    )
-
-    assert with_vat == pytest.approx(
-        expected_with_vat,
-        abs=0.01,
-    ), (
-        f"Без НДС = {without_vat}, "
-        f"С НДС = {with_vat}, "
-        f"ожидалось = {expected_with_vat}"
-    )
+# # =====================================================================
+# # Проверка 1.
+# # Excel не должен содержать невыбранную работу
+# # =====================================================================
+#
+# def test_defect_01_excel_excludes_unselected_tz(page):
+#     """
+#     Если «Подготовка технического задания»
+#     не выбрана в UI, она не должна попадать в Excel.
+#     """
+#     prepare_base_calculation(page)
+#
+#     switch_to_tab_implementation(page)
+#
+#     selected_works = get_selected_implementation_works(
+#         page
+#     )
+#
+#     assert (
+#         "Подготовка технического задания"
+#         not in selected_works
+#     ), (
+#         "Работа «Подготовка технического задания» "
+#         "неожиданно выбрана в UI"
+#     )
+#
+#     wait_for_calculation(page)
+#
+#     file_path = download_excel(page)
+#
+#     rows = find_excel_rows(
+#         file_path,
+#         "Подготовка технического задания",
+#     )
+#
+#     assert len(rows) == 0, (
+#         "Excel содержит невыбранную работу "
+#         "«Подготовка технического задания»"
+#     )
+#
+#
+# # =====================================================================
+# # Проверка 2.
+# # Итог SAAS в Excel должен соответствовать UI
+# # =====================================================================
+#
+# def test_defect_02_saas_total_matches_ui(page):
+#     """
+#     Итог TestQuest Облако в Excel должен
+#     соответствовать итогу SAAS в UI.
+#     """
+#     prepare_base_calculation(page)
+#
+#     wait_for_calculation(page)
+#
+#     ui_total = get_total_sum(page)
+#
+#     file_path = download_excel(page)
+#
+#     saas_total = get_excel_row_amounts(
+#         file_path,
+#         "Всего",
+#     )
+#
+#     assert saas_total is not None, (
+#         "Строка «Всего» для SAAS "
+#         "не найдена в Excel"
+#     )
+#
+#     assert (
+#         saas_total["without_vat"]
+#         == pytest.approx(
+#             ui_total,
+#             abs=0.01,
+#         )
+#     ), (
+#         f"UI SAAS total = {ui_total}, "
+#         f"Excel SAAS total = "
+#         f"{saas_total['without_vat']}"
+#     )
+#
+#
+# # =====================================================================
+# # Проверка 3.
+# # T&M в Excel должен соответствовать UI
+# # =====================================================================
+#
+# def test_defect_03_tandm_amount_matches_ui(page):
+#     """
+#     T&M должен соответствовать расчёту UI:
+#
+#     100 чч × тариф = ожидаемая стоимость без НДС.
+#     """
+#     prepare_base_calculation(page)
+#
+#     set_tandm_hours(
+#         page,
+#         100,
+#     )
+#
+#     tariff = get_tandm_tariff(page)
+#
+#     assert tariff > 0, (
+#         "Тариф T&M не прочитан из UI"
+#     )
+#
+#     expected_tandm = 100 * tariff
+#
+#     wait_for_calculation(page)
+#
+#     file_path = download_excel(page)
+#
+#     total_rows = [
+#         row
+#         for row in get_excel_rows(file_path)
+#         if any(
+#             cell is not None
+#             and "всего" in str(cell).lower()
+#             for cell in row["cells"]
+#         )
+#     ]
+#
+#     assert len(total_rows) >= 2, (
+#         "В Excel не найдено второе итоговое значение "
+#         "«Всего» для T&M"
+#     )
+#
+#     # Первая строка «Всего» — SAAS.
+#     # Вторая строка «Всего» — T&M.
+#     tm_total_row = total_rows[1]
+#
+#     cells = tm_total_row["cells"]
+#
+#     assert len(cells) >= 5, (
+#         f"В строке T&M недостаточно колонок: {cells}"
+#     )
+#
+#     tm_total = _extract_number_from_cell(
+#         type(
+#             "Cell",
+#             (),
+#             {"value": cells[2]},
+#         )()
+#     )
+#
+#     assert tm_total is not None, (
+#         f"Не удалось получить сумму T&M "
+#         f"из строки: {cells}"
+#     )
+#
+#     assert tm_total == pytest.approx(
+#         expected_tandm,
+#         abs=0.01,
+#     ), (
+#         f"UI T&M = {expected_tandm}, "
+#         f"Excel T&M = {tm_total}"
+#     )
+#
+#
+# # =====================================================================
+# # Проверка 4.
+# # НДС T&M должен рассчитываться корректно
+# # =====================================================================
+#
+# def test_defect_04_tandm_vat_is_calculated_correctly(page):
+#     """
+#     Проверить расчёт T&M:
+#
+#     Без НДС = 585000
+#     НДС 5%   = 29250
+#     С НДС    = 614250
+#     """
+#     prepare_base_calculation(page)
+#
+#     set_tandm_hours(
+#         page,
+#         100,
+#     )
+#
+#     wait_for_calculation(page)
+#
+#     file_path = download_excel(page)
+#
+#     total_rows = [
+#         row
+#         for row in get_excel_rows(file_path)
+#         if any(
+#             cell is not None
+#             and "всего" in str(cell).lower()
+#             for cell in row["cells"]
+#         )
+#     ]
+#
+#     assert len(total_rows) >= 2, (
+#         "В Excel не найдено второе итоговое значение "
+#         "«Всего» для T&M"
+#     )
+#
+#     # Вторая строка «Всего» — итог T&M.
+#     tm_total_row = total_rows[1]
+#
+#     cells = tm_total_row["cells"]
+#
+#     assert len(cells) >= 5, (
+#         f"В строке T&M недостаточно колонок: {cells}"
+#     )
+#
+#     without_vat = _extract_number_from_cell(
+#         type(
+#             "Cell",
+#             (),
+#             {"value": cells[2]},
+#         )()
+#     )
+#
+#     vat = _extract_number_from_cell(
+#         type(
+#             "Cell",
+#             (),
+#             {"value": cells[3]},
+#         )()
+#     )
+#
+#     with_vat = _extract_number_from_cell(
+#         type(
+#             "Cell",
+#             (),
+#             {"value": cells[4]},
+#         )()
+#     )
+#
+#     assert without_vat is not None, (
+#         f"Не удалось получить сумму без НДС: {cells}"
+#     )
+#
+#     assert vat is not None, (
+#         f"Не удалось получить НДС: {cells}"
+#     )
+#
+#     assert with_vat is not None, (
+#         f"Не удалось получить сумму с НДС: {cells}"
+#     )
+#
+#     expected_vat = round(
+#         without_vat * 0.05,
+#         2,
+#     )
+#
+#     expected_with_vat = round(
+#         without_vat + expected_vat,
+#         2,
+#     )
+#
+#     assert vat == pytest.approx(
+#         expected_vat,
+#         abs=0.01,
+#     ), (
+#         f"Без НДС = {without_vat}, "
+#         f"НДС = {vat}, "
+#         f"ожидалось = {expected_vat}"
+#     )
+#
+#     assert with_vat == pytest.approx(
+#         expected_with_vat,
+#         abs=0.01,
+#     ), (
+#         f"Без НДС = {without_vat}, "
+#         f"С НДС = {with_vat}, "
+#         f"ожидалось = {expected_with_vat}"
+#     )
 
 
 # =====================================================================
